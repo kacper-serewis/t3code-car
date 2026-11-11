@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  detectLanguage,
   nextSpeakableChunk,
   splitForSpeech,
   spokenCommand,
@@ -76,5 +77,17 @@ describe("spokenCommand", () => {
     expect(spokenCommand("Nee!")).toBe("decline");
     expect(spokenCommand("stil")).toBe("quiet");
     expect(spokenCommand("ja maar gebruik wel de andere branch")).toBeNull();
+  });
+});
+
+describe("detectLanguage", () => {
+  it("tells Dutch from English by common words", () => {
+    expect(detectLanguage("Ik heb de tests gedraaid en ze slagen allemaal.")).toBe("nl-NL");
+    expect(detectLanguage("I ran the tests and all of them pass now.")).toBe("en-US");
+  });
+
+  it("does not guess from too little", () => {
+    expect(detectLanguage("ok")).toBeNull();
+    expect(detectLanguage("")).toBeNull();
   });
 });

@@ -82,7 +82,8 @@ export async function transcribeUtterance(input: {
   readonly apiKey: string;
   readonly uri: string;
   readonly speechStartedMs: number;
-  readonly language: CarLanguage;
+  /** Omitted to let OpenAI detect the language that was spoken. */
+  readonly language?: CarLanguage | undefined;
   readonly signal?: AbortSignal;
 }): Promise<string | null> {
   const recording = parseWav(await new File(input.uri).bytes());
@@ -104,7 +105,7 @@ export async function transcribeUtterance(input: {
         type: "audio/wav",
       } as unknown as Blob);
       form.append("model", model);
-      form.append("language", input.language.slice(0, 2));
+      if (input.language !== undefined) form.append("language", input.language.slice(0, 2));
       form.append("response_format", "json");
       const timeout = withTimeout(input.signal, TRANSCRIPTION_TIMEOUT_MS);
       try {

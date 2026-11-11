@@ -6,16 +6,16 @@ import { useEnvironments } from "@t3tools/mobile/src/state/environments";
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet } from "react-native";
 
-import { updateSettings, useSettings } from "../settings";
+import { updateSettings, useSettings, type LanguageMode } from "../settings";
 import { FieldRow, LargeTitle, NavBar, NavButton, Row, Screen, Section } from "../ui";
 import { checkApiKey } from "../voice/openai";
-import type { CarLanguage } from "../voice/speechText";
 import { CloudAccount } from "./CloudSection";
 
 // A build-time constant: T3 Connect exists only in builds configured for it.
 const cloudEnabled = hasCloudPublicConfig();
 
-const LANGUAGES: ReadonlyArray<{ readonly value: CarLanguage; readonly label: string }> = [
+const LANGUAGES: ReadonlyArray<{ readonly value: LanguageMode; readonly label: string }> = [
+  { value: "auto", label: "Automatisch" },
   { value: "nl-NL", label: "Nederlands" },
   { value: "en-US", label: "English" },
 ];
@@ -116,13 +116,16 @@ export function SettingsScreen(props: {
           />
         </Section>
 
-        <Section header="Taal">
+        <Section
+          header="Taal"
+          footer="Automatisch herkent de taal die je spreekt. Kies een vaste taal als dat misgaat."
+        >
           {LANGUAGES.map((language) => (
             <Row
               key={language.value}
               title={language.label}
-              checked={settings.language === language.value}
-              onPress={() => updateSettings({ language: language.value })}
+              checked={settings.languageMode === language.value}
+              onPress={() => updateSettings({ languageMode: language.value })}
             />
           ))}
         </Section>

@@ -150,6 +150,29 @@ export function splitForSpeech(text: string, maxLength = 280): string[] {
   return parts;
 }
 
+const DUTCH_WORDS = new Set(
+  "de het een ik je jij niet en van dat is wat maar ook naar voor met deze dit kan moet wel nog dan zijn heb hebben wordt worden als bij aan om te er nu al geen waar hoe mijn".split(
+    " ",
+  ),
+);
+const ENGLISH_WORDS = new Set(
+  "the a i you not and of that is what but also to for with this can must still then are have has will be if at on it now no where how my please just do does".split(
+    " ",
+  ),
+);
+
+/** Dutch or English by counting common words; null when the text is too short to tell. */
+export function detectLanguage(text: string): CarLanguage | null {
+  let dutch = 0;
+  let english = 0;
+  for (const word of text.toLowerCase().split(/[^\p{L}]+/u)) {
+    if (DUTCH_WORDS.has(word)) dutch += 1;
+    if (ENGLISH_WORDS.has(word)) english += 1;
+  }
+  if (dutch + english < 2 || dutch === english) return null;
+  return dutch > english ? "nl-NL" : "en-US";
+}
+
 function normalizeCommand(transcript: string): string {
   return transcript
     .toLowerCase()

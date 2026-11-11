@@ -22,7 +22,7 @@ import {
 } from "@t3tools/mobile/src/state/threads";
 import * as Option from "effect/Option";
 
-import { getSettings } from "../settings";
+import { getSettings, noteConversationText } from "../settings";
 import { enterListening, enterQuiet, leaveAudio } from "../voice/audioSession";
 import { deleteRecording, Listener, type Utterance } from "../voice/listener";
 import { transcribeUtterance } from "../voice/openai";
@@ -268,6 +268,7 @@ export class DriveSession {
     let turnEnded = false;
     for (const event of this.feed.advance(projection, result.value.status === "live")) {
       if (event.type === "say") {
+        noteConversationText(event.text);
         lastSaid = event.text;
         this.say(event.text);
       } else if (event.type === "run-finished") {
@@ -327,7 +328,7 @@ export class DriveSession {
   private async onUtterance(utterance: Utterance): Promise<void> {
     this.set({ sending: true });
     let text = utterance.text;
-    const { openAiKey, language } = getSettings();
+    const { openAiKey, language, languageMode } = getSettings();
     if (openAiKey !== null && utterance.audioUri !== null) {
       try {
         text =
@@ -335,7 +336,8 @@ export class DriveSession {
             apiKey: openAiKey,
             uri: utterance.audioUri,
             speechStartedMs: utterance.speechStartedMs,
-            language,
+            // In `auto` OpenAI hears for itself which language was spoken.
+            ...(languageMode === "auto" ? {} : { language }),
           })) || text;
       } catch {
         // No reach or a rejected key: the on-device transcript is good enough to send.
@@ -343,6 +345,7 @@ export class DriveSession {
     }
     deleteRecording(utterance.audioUri);
     text = text.trim();
+    noteConversationText(text);
     // `sending` is cleared first so what the app says next is not held back.
     if (text && !this.disposed) {
       const spoken = await this.handleSpoken(text);
