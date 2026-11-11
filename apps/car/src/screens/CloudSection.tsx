@@ -13,6 +13,21 @@ import { useEffect, useState } from "react";
 
 import { FieldRow, Row, Section } from "../ui";
 
+const AVAILABILITY_ORDER = { online: 0, checking: 1, error: 2, offline: 3 } as const;
+const AVAILABILITY_LABEL = {
+  online: "Online",
+  checking: "Controleren…",
+  error: "Onbekend",
+  offline: "Offline",
+} as const;
+
+function linkedOn(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? iso
+    : date.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function messageOf(error: unknown, fallback: string): string {
   if (error && typeof error === "object") {
     const clerk = error as {
@@ -164,7 +179,12 @@ function LinkedComputers(props: { readonly onConnected: () => void }) {
   const discovery = useAtomValue(relayEnvironmentDiscovery.stateValueAtom);
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const [error, setError] = useState<string | null>(null);
-  const environments = [...discovery.environments.values()].map((entry) => entry.environment);
+  // Several links can carry the same name; the ones that answer come first.
+  const entries = [...discovery.environments.values()].sort(
+    (left, right) =>
+      AVAILABILITY_ORDER[left.availability] - AVAILABILITY_ORDER[right.availability] ||
+      right.environment.linkedAt.localeCompare(left.environment.linkedAt),
+  );
 
   // The list is read once per sign-in; without this it stays empty until the app restarts.
   useEffect(() => {
@@ -196,19 +216,21 @@ function LinkedComputers(props: { readonly onConnected: () => void }) {
       header="T3 Connect"
       footer={error ?? `Ingelogd als ${user?.primaryEmailAddress?.emailAddress ?? "je account"}.`}
     >
-      {environments.length === 0 ? (
+      {entries.length === 0 ? (
         <Row
           title={discovery.refreshing ? "Computers zoeken…" : "Geen computers gevonden"}
           subtitle={discovery.refreshing ? null : "Zet T3 Connect aan in T3 Code op je computer."}
         />
       ) : null}
-      {environments.map((environment) => {
+      {entries.map(({ environment, availability }) => {
         const added = catalog.entries.has(environment.environmentId);
         return (
           <Row
             key={environment.environmentId}
             kind={added ? "text" : "action"}
             title={environment.label}
+            subtitle={`Gekoppeld op ${linkedOn(environment.linkedAt)}`}
+            detail={AVAILABILITY_LABEL[availability]}
             checked={added}
             onPress={added ? undefined : () => void add(environment)}
           />

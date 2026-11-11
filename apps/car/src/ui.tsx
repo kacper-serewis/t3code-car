@@ -126,11 +126,7 @@ export function Row(props: {
         >
           {props.title}
         </Text>
-        {props.subtitle ? (
-          <Text numberOfLines={2} style={styles.rowSubtitle}>
-            {props.subtitle}
-          </Text>
-        ) : null}
+        {props.subtitle ? <Text style={styles.rowSubtitle}>{props.subtitle}</Text> : null}
       </View>
       {props.detail ? <Text style={styles.rowDetail}>{props.detail}</Text> : null}
       {props.checked ? <SymbolView name="checkmark" size={17} tintColor={colors.tint} /> : null}
