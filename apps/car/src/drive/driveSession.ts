@@ -57,8 +57,8 @@ const MAX_SPOKEN_DETAIL = 220;
 
 /**
  * One hands-free conversation with a thread: joining is silent, new agent text is read aloud.
- * The microphone opens by itself only when the agent waits for the user (its turn ended on a
- * question, or it asks for approval or a choice); otherwise it stays closed, so music plays.
+ * The microphone opens by itself only when the agent waits for the user (its turn ended, or
+ * it asks for approval or a choice); while a turn runs it stays closed, so music plays.
  */
 export class DriveSession {
   private snapshot: DriveSnapshot = {
@@ -265,7 +265,7 @@ export class DriveSession {
     if (projection === null) return;
     const language = getSettings().language;
     let lastSaid = this.snapshot.lastSaid;
-    let asked = false;
+    let turnEnded = false;
     for (const event of this.feed.advance(projection, result.value.status === "live")) {
       if (event.type === "say") {
         lastSaid = event.text;
@@ -273,11 +273,13 @@ export class DriveSession {
       } else if (event.type === "run-finished") {
         if (event.status === "failed") this.say(phrase(language, "failed"));
         else if (event.status === "completed" && !event.spoke) this.say(phrase(language, "done"));
-        // A turn that ended on a question is the agent waiting for an answer.
-        if (event.status === "completed" && event.asksUser) asked = true;
+        turnEnded = true;
       }
     }
     this.set({ joined: this.feed.joined, agentBusy: hasActiveRun(projection), lastSaid });
+    // The same state the T3 Code composer shows: with no run left the send button is back and
+    // the agent waits for the user; while a run is active (stop button) it is still working.
+    let asked = turnEnded && !hasActiveRun(projection);
     if (this.feed.joined && this.onPendingRequests()) asked = true;
     if (asked) this.promptUser();
   }

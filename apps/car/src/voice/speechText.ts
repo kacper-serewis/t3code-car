@@ -150,19 +150,6 @@ export function splitForSpeech(text: string, maxLength = 280): string[] {
   return parts;
 }
 
-/**
- * True when the text closes with a question for the user, which is when the microphone should
- * open by itself. Only the last two sentences count, so a question earlier in a long reply
- * that the agent went on to answer itself does not.
- */
-export function endsWithQuestion(markdown: string): boolean {
-  const sentences = toSpeakableText(markdown)
-    .split(/(?<=[.!?…])\s+|\n+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-  return sentences.slice(-2).some((sentence) => sentence.endsWith("?"));
-}
-
 function normalizeCommand(transcript: string): string {
   return transcript
     .toLowerCase()

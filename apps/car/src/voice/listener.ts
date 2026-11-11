@@ -175,7 +175,8 @@ export class Listener {
         this.handlers.onProblem("Deze taal wordt niet ondersteund door de spraakherkenning.");
         break;
       default:
-        this.handlers.onProblem("De microfoon is niet beschikbaar.");
+        // The recognizer's own code tells a route problem from a missing language model.
+        this.handlers.onProblem(`De microfoon is niet beschikbaar (${event.error}).`);
         break;
     }
     // Some failures arrive without an `end`.

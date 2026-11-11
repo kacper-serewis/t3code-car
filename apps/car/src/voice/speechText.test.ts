@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  endsWithQuestion,
   nextSpeakableChunk,
   splitForSpeech,
   spokenCommand,
@@ -68,28 +67,6 @@ describe("splitForSpeech", () => {
       "Nog een zin.",
       "En nog een.",
     ]);
-  });
-});
-
-describe("endsWithQuestion", () => {
-  it("is true when the reply closes with a question", () => {
-    expect(endsWithQuestion("Ik zie twee opties. Zal ik de eerste nemen?")).toBe(true);
-    expect(endsWithQuestion("Welke branch wil je?\n\nLaat het me weten.")).toBe(true);
-    expect(endsWithQuestion("Klaar. **Wil je dat ik ook push?**")).toBe(true);
-  });
-
-  it("is false when the agent only reports or gets to work", () => {
-    expect(endsWithQuestion("Ik ga nu aan de slag met de tests.")).toBe(false);
-    expect(endsWithQuestion("Klaar, alles is gepusht.")).toBe(false);
-    expect(endsWithQuestion("")).toBe(false);
-  });
-
-  it("ignores a question the agent already moved past", () => {
-    expect(
-      endsWithQuestion(
-        "Waarom faalde dit? De import klopte niet. Ik heb hem hersteld. De tests slagen.",
-      ),
-    ).toBe(false);
   });
 });
 

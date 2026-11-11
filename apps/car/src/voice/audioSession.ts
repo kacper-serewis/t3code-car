@@ -43,6 +43,16 @@ function pauseKeepAlive(): void {
   }
 }
 
+function releaseKeepAlive(): void {
+  try {
+    keepAlive?.pause();
+    keepAlive?.remove();
+  } catch {
+    // Released.
+  }
+  keepAlive = null;
+}
+
 async function activate(interruptionMode: "mixWithOthers" | "duckOthers"): Promise<void> {
   pauseKeepAlive();
   // Lowering or restoring other audio only takes effect when the session is activated again.
@@ -85,20 +95,17 @@ export function enterSpeaking(): Promise<void> {
 /** Hand the session to the speech recognizer, which stops the music. */
 export function enterListening(): Promise<void> {
   return transition("listening", async () => {
-    pauseKeepAlive();
+    // The recognizer reconfigures the session for recording; it must find it released, or the
+    // audio server can stall while both hold it.
+    releaseKeepAlive();
+    await setIsAudioActiveAsync(false).catch(() => {});
   });
 }
 
 /** Leaving the conversation: give audio back to the other apps. */
 export function leaveAudio(): Promise<void> {
   return transition("off", async () => {
-    try {
-      keepAlive?.pause();
-      keepAlive?.remove();
-    } catch {
-      // Released.
-    }
-    keepAlive = null;
+    releaseKeepAlive();
     await setIsAudioActiveAsync(false).catch(() => {});
   });
 }

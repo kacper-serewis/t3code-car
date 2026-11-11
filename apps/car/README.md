@@ -6,9 +6,10 @@ you only talk and listen:
 - **Joining is silent.** Nothing is sent and the thread's history is not read aloud. T3 Car
   follows the thread and speaks only what the agent writes after you joined, sentence by
   sentence while it streams, including its short remarks between tool calls.
-- **The microphone opens when the agent waits for you.** That is when its turn ends on a
-  question, or it asks for approval or a choice. While it only says it is getting to work, the
-  microphone stays closed. One tap opens it at any other moment, also to cut the agent off.
+- **The microphone opens when the agent waits for you.** That is when its turn has ended (the
+  moment the T3 Code composer shows the send button again), or when it asks for approval or a
+  choice. While a turn runs the microphone stays closed, also when the agent says it is getting
+  to work. One tap opens it at any other moment, also to cut the agent off.
 - **You never have to answer.** Say nothing and the microphone closes again after a few seconds.
 - **Your music keeps playing.** It is lowered only while a voice actually plays, and stops only
   while the microphone is open.
