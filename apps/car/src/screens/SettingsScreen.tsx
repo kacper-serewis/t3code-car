@@ -85,9 +85,12 @@ export function SettingsScreen(props: {
           header="OpenAI API-key"
           footer={
             keyStatus ??
-            "Met een key leest OpenAI de agent voor en zet het om wat je zegt. Zonder key, of zonder bereik, gebruikt T3 Car de stem en spraakherkenning van iOS. De key staat alleen in de sleutelhanger van dit toestel."
+            (settings.openAiKey === null
+              ? "Geen key: T3 Car gebruikt nu de stem en spraakherkenning van iOS. Met een key leest OpenAI de agent voor en zet het om wat je zegt. De key staat alleen in de sleutelhanger van dit toestel."
+              : "OpenAI is actief: het leest de agent voor en zet om wat je zegt. Zonder bereik valt T3 Car terug op iOS.")
           }
         >
+          <Row title="Spraak" detail={settings.openAiKey === null ? "iOS" : "OpenAI"} />
           <FieldRow
             value={keyDraft}
             onChangeText={(value) => {
