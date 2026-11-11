@@ -182,6 +182,7 @@ export default defineConfig({
       "apps/server/schema/**",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
+      "apps/car/ios/**",
       "apps/mobile/uniwind-types.d.ts",
       // Vendored and generated C.
       "apps/mobile/modules/t3-highlights/Vendor/**",
@@ -215,6 +216,7 @@ export default defineConfig({
       "apps/server/schema/**",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
+      "apps/car/ios/**",
       "apps/mobile/uniwind-types.d.ts",
     ],
     plugins: ["eslint", "oxc", "react", "unicorn", "typescript"],

@@ -1,0 +1,31 @@
+{
+  "extends": ["expo/tsconfig.base.json", "../../tsconfig.effect.json"],
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        // React Native has no Effect platform layer.
+        "diagnosticSeverity": {
+          "globalDate": "off",
+          "globalConsole": "off",
+          "globalRandom": "off",
+          "globalTimers": "off",
+          "globalFetch": "off"
+        }
+      }
+    ],
+    // The Expo config and the shared packages it reaches use Node types.
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
+  },
+  "include": [
+    "index.ts",
+    "app.config.ts",
+    "src",
+    "../mobile/assets.d.ts",
+    "../mobile/uniwind-types.d.ts"
+  ]
+}

@@ -127,6 +127,22 @@
         "@t3tools/mobile-terminal-native",
       ],
     },
+    "apps/car": {
+      "entry": ["index.ts!"],
+      // The connection and state modules reused from apps/mobile load these native packages;
+      // Expo only links what this app lists itself. Babel is the Expo preset's peer.
+      "ignoreDependencies": [
+        "@babel/core",
+        "expo-constants",
+        "expo-crypto",
+        "expo-device",
+        "expo-document-picker",
+        "expo-image",
+        "expo-image-manipulator",
+        "expo-image-picker",
+        "expo-network",
+      ],
+    },
     "apps/mobile/modules/t3-highlights": {
       // Nitrogen discovers HybridObject specifications by filename.
       "entry": ["src/*.nitro.ts!"],
