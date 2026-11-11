@@ -128,7 +128,8 @@
       ],
     },
     "apps/car": {
-      "entry": ["index.ts!"],
+      // Expo Router loads every file under src/app as a route.
+      "entry": ["src/app/**/*.tsx!"],
       // The connection and state modules reused from apps/mobile load these native packages;
       // Expo only links what this app lists itself. Babel is the Expo preset's peer.
       "ignoreDependencies": [

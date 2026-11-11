@@ -39,6 +39,7 @@ const config: ExpoConfig = {
     // T3 Car has no push, and a Personal Team cannot sign it. Mods run in reverse plugin order,
     // so first in the list strips the entitlement after the notifications module added it.
     "../mobile/plugins/withoutIosPersonalTeamCapabilities.cjs",
+    "expo-router",
     "expo-secure-store",
     "expo-sqlite",
     ["expo-audio", { microphonePermission: MICROPHONE_PURPOSE }],

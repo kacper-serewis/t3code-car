@@ -1,5 +1,15 @@
 import { useAuth, useSignIn, useUser } from "@clerk/expo";
 import { useAtomValue } from "@effect/atom-react";
+import { Button, HStack, Image, Section, Spacer, Text, TextField, VStack } from "@expo/ui/swift-ui";
+import {
+  autocorrectionDisabled,
+  buttonStyle,
+  disabled,
+  keyboardType,
+  onSubmit,
+  textContentType,
+  textInputAutocapitalization,
+} from "@expo/ui/swift-ui/modifiers";
 import {
   RelayConnectionRegistration,
   RelayConnectionTarget,
@@ -10,8 +20,9 @@ import { environmentCatalog } from "@t3tools/mobile/src/connection/catalog";
 import { appAtomRegistry } from "@t3tools/mobile/src/state/atom-registry";
 import { relayEnvironmentDiscovery } from "@t3tools/mobile/src/state/relay";
 import { useEffect, useState } from "react";
+import { PlatformColor } from "react-native";
 
-import { FieldRow, Row, Section } from "../ui";
+import { footnote, primaryText, secondaryText, subheadline } from "./native";
 
 const AVAILABILITY_ORDER = { online: 0, checking: 1, error: 2, offline: 3 } as const;
 const AVAILABILITY_LABEL = {
@@ -41,6 +52,10 @@ function messageOf(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function Footer(props: { readonly children: string }) {
+  return <Text modifiers={[footnote, secondaryText]}>{props.children}</Text>;
+}
+
 /**
  * T3 Connect on the pairing screen: sign in with a code sent by email, then add the computers
  * linked to the account. Rendered only in builds configured for T3 Connect, inside Clerk.
@@ -49,8 +64,8 @@ export function CloudSection(props: { readonly onConnected: () => void }) {
   const { isLoaded, isSignedIn } = useAuth();
   if (!isLoaded) {
     return (
-      <Section header="T3 Connect">
-        <Row title="Laden…" />
+      <Section title="T3 Connect">
+        <Text modifiers={[secondaryText]}>Laden…</Text>
       </Section>
     );
   }
@@ -64,15 +79,15 @@ export function CloudAccount(props: { readonly onSignIn: () => void }) {
   if (!isLoaded) return null;
   if (!isSignedIn) {
     return (
-      <Section header="T3 Connect">
-        <Row kind="action" title="Log in" onPress={props.onSignIn} />
+      <Section title="T3 Connect">
+        <Button label="Log in" onPress={props.onSignIn} />
       </Section>
     );
   }
   return (
-    <Section header="T3 Connect">
-      <Row title={user?.primaryEmailAddress?.emailAddress ?? "Ingelogd"} />
-      <Row kind="destructive" title="Log uit" onPress={() => void signOut()} />
+    <Section title="T3 Connect">
+      <Text>{user?.primaryEmailAddress?.emailAddress ?? "Ingelogd"}</Text>
+      <Button label="Log uit" role="destructive" onPress={() => void signOut()} />
     </Section>
   );
 }
@@ -119,51 +134,50 @@ function EmailCodeSignIn() {
   if (!codeSent) {
     return (
       <Section
-        header="T3 Connect"
-        footer={error ?? "Je krijgt een code per e-mail om in te loggen."}
+        title="T3 Connect"
+        footer={<Footer>{error ?? "Je krijgt een code per e-mail om in te loggen."}</Footer>}
       >
-        <FieldRow
-          value={email}
-          onChangeText={setEmail}
+        <TextField
           placeholder="E-mailadres"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          keyboardType="email-address"
-          returnKeyType="send"
-          onSubmitEditing={() => void sendCode()}
+          onTextChange={setEmail}
+          modifiers={[
+            keyboardType("email-address"),
+            textContentType("emailAddress"),
+            textInputAutocapitalization("never"),
+            autocorrectionDisabled(),
+            onSubmit(() => void sendCode()),
+          ]}
         />
-        <Row
-          kind="action"
-          title={busy ? "Versturen…" : "Stuur code"}
-          disabled={busy || !email.trim()}
+        <Button
+          label={busy ? "Versturen…" : "Stuur code"}
           onPress={() => void sendCode()}
+          modifiers={[disabled(busy || !email.trim())]}
         />
       </Section>
     );
   }
 
   return (
-    <Section header="T3 Connect" footer={error ?? `De code is gestuurd naar ${email.trim()}.`}>
-      <FieldRow
-        value={code}
-        onChangeText={setCode}
+    <Section
+      title="T3 Connect"
+      footer={<Footer>{error ?? `De code is gestuurd naar ${email.trim()}.`}</Footer>}
+    >
+      <TextField
         placeholder="Code"
-        autoComplete="one-time-code"
-        textContentType="oneTimeCode"
-        keyboardType="number-pad"
-        returnKeyType="done"
-        onSubmitEditing={() => void verify()}
+        onTextChange={setCode}
+        modifiers={[
+          keyboardType("numeric"),
+          textContentType("oneTimeCode"),
+          onSubmit(() => void verify()),
+        ]}
       />
-      <Row
-        kind="action"
-        title={busy ? "Controleren…" : "Log in"}
-        disabled={busy || !code.trim()}
+      <Button
+        label={busy ? "Controleren…" : "Log in"}
         onPress={() => void verify()}
+        modifiers={[disabled(busy || !code.trim())]}
       />
-      <Row
-        kind="action"
-        title="Ander e-mailadres"
+      <Button
+        label="Ander e-mailadres"
         onPress={() => {
           setCodeSent(false);
           setCode("");
@@ -213,27 +227,43 @@ function LinkedComputers(props: { readonly onConnected: () => void }) {
 
   return (
     <Section
-      header="T3 Connect"
-      footer={error ?? `Ingelogd als ${user?.primaryEmailAddress?.emailAddress ?? "je account"}.`}
+      title="T3 Connect"
+      footer={
+        <Footer>
+          {error ?? `Ingelogd als ${user?.primaryEmailAddress?.emailAddress ?? "je account"}.`}
+        </Footer>
+      }
     >
       {entries.length === 0 ? (
-        <Row
-          title={discovery.refreshing ? "Computers zoeken…" : "Geen computers gevonden"}
-          subtitle={discovery.refreshing ? null : "Zet T3 Connect aan in T3 Code op je computer."}
-        />
+        <Text modifiers={[secondaryText]}>
+          {discovery.refreshing
+            ? "Computers zoeken…"
+            : "Geen computers gevonden. Zet T3 Connect aan in T3 Code op je computer."}
+        </Text>
       ) : null}
       {entries.map(({ environment, availability }) => {
         const added = catalog.entries.has(environment.environmentId);
         return (
-          <Row
+          <Button
             key={environment.environmentId}
-            kind={added ? "text" : "action"}
-            title={environment.label}
-            subtitle={`Gekoppeld op ${linkedOn(environment.linkedAt)}`}
-            detail={AVAILABILITY_LABEL[availability]}
-            checked={added}
-            onPress={added ? undefined : () => void add(environment)}
-          />
+            onPress={() => void add(environment)}
+            modifiers={[buttonStyle("plain"), disabled(added)]}
+          >
+            <HStack spacing={10}>
+              <VStack alignment="leading" spacing={2}>
+                <Text modifiers={[primaryText]}>{environment.label}</Text>
+                <Text modifiers={[secondaryText, subheadline]}>
+                  {`${AVAILABILITY_LABEL[availability]} · gekoppeld op ${linkedOn(environment.linkedAt)}`}
+                </Text>
+              </VStack>
+              <Spacer />
+              <Image
+                systemName={added ? "checkmark" : "plus.circle"}
+                size={17}
+                color={PlatformColor("systemBlue")}
+              />
+            </HStack>
+          </Button>
         );
       })}
     </Section>

@@ -21,6 +21,7 @@ import {
   threadEnvironment,
 } from "@t3tools/mobile/src/state/threads";
 import * as Option from "effect/Option";
+import * as Haptics from "expo-haptics";
 
 import { getSettings, noteConversationText } from "../settings";
 import { enterListening, enterQuiet, leaveAudio } from "../voice/audioSession";
@@ -143,6 +144,8 @@ export class DriveSession {
       this.listener.cancel();
       return;
     }
+    // Felt at once, before the audio session has switched.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     // Tapping while the agent talks cuts it off so the user can speak.
     this.speaker.stop();
     void this.openMic();
@@ -234,6 +237,8 @@ export class DriveSession {
     if (this.disposed || this.micOpening || this.listener.active) return;
     this.promptPending = false;
     this.micOpening = true;
+    // Shown before the audio session has switched, so a tap answers at once.
+    this.set({ micOn: true });
     await enterListening();
     const opened = await this.listener.start();
     this.micOpening = false;
@@ -241,8 +246,10 @@ export class DriveSession {
       this.listener.cancel();
       return;
     }
-    this.set({ micOn: opened });
-    if (!opened) void enterQuiet();
+    if (!opened) {
+      this.set({ micOn: false });
+      void enterQuiet();
+    }
   }
 
   private async onMicClosed(utterance: Utterance | null): Promise<void> {
