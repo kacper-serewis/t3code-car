@@ -99,9 +99,9 @@ export class Listener {
           ],
           mode: AVAudioSessionMode.measurement,
         },
-        // Kept only when OpenAI transcribes; 16 kHz mono keeps the upload small.
+        // The recording is what gets transcribed; 16 kHz mono is what the computer expects.
         recordingOptions: {
-          persist: getSettings().openAiKey !== null,
+          persist: true,
           outputSampleRate: 16_000,
           outputEncoding: "pcmFormatInt16",
         },

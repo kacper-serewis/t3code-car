@@ -13,8 +13,10 @@ export interface CarSettings {
    * conversation. Derived, never stored.
    */
   readonly language: CarLanguage;
-  /** With a key, OpenAI reads replies aloud and transcribes what you say. */
+  /** With a key, OpenAI reads replies aloud, and transcribes when the computer cannot. */
   readonly openAiKey: string | null;
+  /** The computer's text model cleans up transcripts: punctuation, filler, corrections. */
+  readonly cleanup: boolean;
 }
 
 const KEY = "t3car.settings.v2";
@@ -54,6 +56,7 @@ function load(): CarSettings {
       typeof source?.openAiKey === "string" && source.openAiKey.trim()
         ? source.openAiKey.trim()
         : null,
+    cleanup: stored?.cleanup !== false,
   };
 }
 
@@ -65,7 +68,7 @@ export function getSettings(): CarSettings {
 }
 
 export function updateSettings(
-  patch: Partial<Pick<CarSettings, "languageMode" | "openAiKey">>,
+  patch: Partial<Pick<CarSettings, "languageMode" | "openAiKey" | "cleanup">>,
 ): void {
   const next = { ...current, ...patch };
   current = {
@@ -81,7 +84,11 @@ export function updateSettings(
     // The API key lives in the Keychain with the rest; nothing here is synced or backed up in plain text.
     SecureStore.setItem(
       KEY,
-      JSON.stringify({ languageMode: current.languageMode, openAiKey: current.openAiKey }),
+      JSON.stringify({
+        languageMode: current.languageMode,
+        openAiKey: current.openAiKey,
+        cleanup: current.cleanup,
+      }),
     );
   } catch {
     // Settings still apply for this launch.

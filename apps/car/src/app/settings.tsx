@@ -9,6 +9,7 @@ import {
   SecureField,
   Spacer,
   Text,
+  Toggle,
 } from "@expo/ui/swift-ui";
 import {
   autocorrectionDisabled,
@@ -101,17 +102,38 @@ export default function Settings() {
       <Host style={layout.fill}>
         <Form>
           <Section
-            title="Spraak"
+            title="Verstaan"
+            footer={
+              <Footer>
+                Wat je zegt gaat via T3 Code op je computer naar OpenAI, met het gedeelde
+                woordenboek van je computer. Opschonen zet leestekens goed, haalt "eh" weg en
+                verwerkt gesproken correcties. Is je computer niet bereikbaar, dan gebruikt T3 Car
+                de key hieronder of iOS.
+              </Footer>
+            }
+          >
+            <LabeledContent label="Via">
+              <Text>Je computer</Text>
+            </LabeledContent>
+            <Toggle
+              label="Opschonen"
+              isOn={settings.cleanup}
+              onIsOnChange={(cleanup) => updateSettings({ cleanup })}
+            />
+          </Section>
+
+          <Section
+            title="Voorlezen"
             footer={
               <Footer>
                 {keyStatus ??
                   (hasKey
-                    ? "OpenAI leest de agent voor en zet om wat je zegt. Zonder bereik valt T3 Car terug op iOS."
-                    : "Met een OpenAI API-key leest OpenAI de agent voor en zet het om wat je zegt. De key staat alleen in de sleutelhanger van dit toestel.")}
+                    ? "OpenAI leest de agent voor. Zonder bereik valt T3 Car terug op de stem van iOS."
+                    : "Met een OpenAI API-key leest OpenAI de agent voor, anders de stem van iOS. De key staat alleen in de sleutelhanger van dit toestel.")}
               </Footer>
             }
           >
-            <LabeledContent label="Stem en herkenning">
+            <LabeledContent label="Stem">
               <Text>{hasKey ? "OpenAI" : "iOS"}</Text>
             </LabeledContent>
             <SecureField
@@ -133,7 +155,7 @@ export default function Settings() {
                 role="destructive"
                 onPress={() => {
                   updateSettings({ openAiKey: null });
-                  setKeyStatus("Key verwijderd. T3 Car gebruikt de stem en herkenning van iOS.");
+                  setKeyStatus("Key verwijderd. T3 Car leest voor met de stem van iOS.");
                 }}
               />
             ) : null}

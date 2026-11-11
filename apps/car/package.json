@@ -19,6 +19,7 @@
     "@t3tools/client-runtime": "workspace:*",
     "@t3tools/contracts": "workspace:*",
     "@t3tools/mobile": "workspace:*",
+    "@t3tools/shared": "workspace:*",
     "effect": "catalog:",
     "expo": "58.0.23",
     "expo-application": "~58.1.2",

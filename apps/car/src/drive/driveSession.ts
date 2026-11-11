@@ -17,6 +17,7 @@ import { readEnvironmentScope } from "@t3tools/mobile/src/state/session";
 import { enqueueThreadOutboxMessage } from "@t3tools/mobile/src/state/thread-outbox";
 import {
   environmentThreadDetails,
+  environmentThreadShells,
   environmentThreads,
   threadEnvironment,
 } from "@t3tools/mobile/src/state/threads";
@@ -26,6 +27,7 @@ import * as Haptics from "expo-haptics";
 import { getSettings, noteConversationText } from "../settings";
 import { enterListening, enterQuiet, leaveAudio } from "../voice/audioSession";
 import { deleteRecording, Listener, type Utterance } from "../voice/listener";
+import { transcribeOnComputer } from "../voice/macTranscription";
 import { transcribeUtterance } from "../voice/openai";
 import { Speaker } from "../voice/speaker";
 import { phrase, spokenCommand, toSpeakableText } from "../voice/speechText";
@@ -334,24 +336,8 @@ export class DriveSession {
 
   private async onUtterance(utterance: Utterance): Promise<void> {
     this.set({ sending: true });
-    let text = utterance.text;
-    const { openAiKey, language, languageMode } = getSettings();
-    if (openAiKey !== null && utterance.audioUri !== null) {
-      try {
-        text =
-          (await transcribeUtterance({
-            apiKey: openAiKey,
-            uri: utterance.audioUri,
-            speechStartedMs: utterance.speechStartedMs,
-            // In `auto` OpenAI hears for itself which language was spoken.
-            ...(languageMode === "auto" ? {} : { language }),
-          })) || text;
-      } catch {
-        // No reach or a rejected key: the on-device transcript is good enough to send.
-      }
-    }
+    const text = await this.transcribe(utterance);
     deleteRecording(utterance.audioUri);
-    text = text.trim();
     noteConversationText(text);
     // `sending` is cleared first so what the app says next is not held back.
     if (text && !this.disposed) {
@@ -361,6 +347,48 @@ export class DriveSession {
     } else {
       this.set({ sending: false });
     }
+  }
+
+  /**
+   * What the user said, from the best source that answers: T3 Code on the computer (OpenAI with
+   * its dictionary and cleanup), then OpenAI with the key in this app, then on-device recognition.
+   */
+  private async transcribe(utterance: Utterance): Promise<string> {
+    const { openAiKey, language, languageMode, cleanup } = getSettings();
+    // In `auto` OpenAI hears for itself which language was spoken.
+    const fixedLanguage = languageMode === "auto" ? undefined : language;
+    const uri = utterance.audioUri;
+    if (uri !== null) {
+      const shell = appAtomRegistry.get(environmentThreadShells.threadShellAtom(this.thread));
+      try {
+        const text = await transcribeOnComputer({
+          environmentId: this.thread.environmentId,
+          projectId: shell?.projectId ?? null,
+          projectName: null,
+          uri,
+          speechStartedMs: utterance.speechStartedMs,
+          language: fixedLanguage,
+          cleanup,
+        });
+        if (text) return text;
+      } catch {
+        // The computer could not transcribe: no OpenAI key there, or no reach.
+      }
+      if (openAiKey !== null) {
+        try {
+          const text = await transcribeUtterance({
+            apiKey: openAiKey,
+            uri,
+            speechStartedMs: utterance.speechStartedMs,
+            language: fixedLanguage,
+          });
+          if (text) return text;
+        } catch {
+          // No reach or a rejected key.
+        }
+      }
+    }
+    return utterance.text.trim();
   }
 
   /** Acts on what the user said. Returns what to say back, if anything. */
