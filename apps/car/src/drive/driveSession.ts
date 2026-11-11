@@ -23,10 +23,11 @@ import {
 import * as Option from "effect/Option";
 
 import { getSettings } from "../settings";
+import { enterListening, enterQuiet, leaveAudio } from "../voice/audioSession";
 import { deleteRecording, Listener, type Utterance } from "../voice/listener";
 import { transcribeUtterance } from "../voice/openai";
 import { Speaker } from "../voice/speaker";
-import { isLikelyEcho, phrase, spokenCommand, toSpeakableText } from "../voice/speechText";
+import { phrase, spokenCommand, toSpeakableText } from "../voice/speechText";
 import { hasActiveRun, ThreadFeed } from "./threadFeed";
 
 export interface DriveThreadRef {
@@ -37,6 +38,7 @@ export interface DriveThreadRef {
 export interface DriveSnapshot {
   /** The thread is synchronized; from here on new agent text is read aloud. */
   readonly joined: boolean;
+  /** The microphone is open, which stops the music. */
   readonly micOn: boolean;
   /** What the user is saying right now. */
   readonly hearing: string | null;
@@ -51,15 +53,12 @@ export interface DriveSnapshot {
   readonly notice: string | null;
 }
 
-/** After the app stops speaking, its voice can still arrive at the microphone this long. */
-const ECHO_TAIL_MS = 1_500;
 const MAX_SPOKEN_DETAIL = 220;
 
 /**
- * One hands-free conversation with a thread. Joining says nothing and sends nothing: the
- * session follows the thread, reads aloud what the agent writes from then on, and keeps
- * listening so the user can speak at any moment, or not at all.
- * Lives outside React so the microphone and the voice have one owner.
+ * One hands-free conversation with a thread: joining is silent, new agent text is read aloud.
+ * The microphone opens by itself only when the agent waits for the user (its turn ended on a
+ * question, or it asks for approval or a choice); otherwise it stays closed, so music plays.
  */
 export class DriveSession {
   private snapshot: DriveSnapshot = {
@@ -78,29 +77,21 @@ export class DriveSession {
   private readonly listeners = new Set<() => void>();
   private readonly feed = new ThreadFeed(() => getSettings().language);
   private readonly speaker = new Speaker((speaking) => {
-    if (!speaking) this.lastSpokeAt = Date.now();
     this.set({ speaking });
+    if (!speaking) this.afterSpeech();
   });
   private readonly listener = new Listener({
-    onHearing: (text) => {
-      // Talking over the agent cuts it off.
-      if (text !== null && this.speaker.speaking && getSettings().voiceInterrupt) {
-        this.speaker.stop();
-      }
-      this.set({ hearing: text });
-    },
-    onUtterance: (utterance) => void this.onUtterance(utterance),
+    onHearing: (hearing) => this.set({ hearing }),
+    onClosed: (utterance) => void this.onMicClosed(utterance),
     onProblem: (notice) => this.set({ notice }),
-    shouldIgnore: (heard) => {
-      const echoPossible = this.speaker.speaking || Date.now() - this.lastSpokeAt < ECHO_TAIL_MS;
-      if (!echoPossible) return false;
-      if (this.speaker.speaking && !getSettings().voiceInterrupt) return true;
-      return isLikelyEcho(heard, this.speaker.recentText());
-    },
-    canRecycle: () => !this.speaker.speaking && !this.snapshot.sending,
   });
   private readonly announced = new Set<string>();
-  private lastSpokeAt = 0;
+  /** Agent text that arrived while the user had the floor. */
+  private held: string[] = [];
+  /** Open the microphone once the voice has finished. */
+  private promptPending = false;
+  /** The microphone is being opened; nothing else may claim the audio session meanwhile. */
+  private micOpening = false;
   private unsubscribe: (() => void) | null = null;
   private disposed = false;
 
@@ -131,35 +122,30 @@ export class DriveSession {
       unsubscribeState();
       unsubscribeRequests();
     };
-    void this.setMic(true);
+    void enterQuiet();
   }
 
   dispose(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
-    this.listener.stop();
-    this.speaker.stop();
     this.disposed = true;
-  }
-
-  async setMic(on: boolean): Promise<void> {
-    if (on) {
-      const started = await this.listener.start();
-      if (this.disposed) this.listener.stop();
-      else this.set({ micOn: started });
-    } else {
-      this.listener.stop();
-      this.set({ micOn: false, hearing: null });
-    }
-  }
-
-  toggleMic(): void {
-    void this.setMic(!this.snapshot.micOn);
-  }
-
-  /** Cuts off what is being read aloud. */
-  silence(): void {
+    this.promptPending = false;
+    this.held = [];
+    this.listener.cancel();
     this.speaker.stop();
+    void leaveAudio();
+  }
+
+  /** The one tap: take the floor, or give it back. */
+  tap(): void {
+    if (this.snapshot.sending) return;
+    if (this.listener.active) {
+      this.listener.cancel();
+      return;
+    }
+    // Tapping while the agent talks cuts it off so the user can speak.
+    this.speaker.stop();
+    void this.openMic();
   }
 
   /** Stops the agent's current turn. */
@@ -175,6 +161,8 @@ export class DriveSession {
   respondToApproval(decision: ProviderApprovalDecision): void {
     const approval = this.snapshot.approval;
     if (approval === null) return;
+    this.promptPending = false;
+    this.listener.cancel();
     this.set({ approval: null });
     this.say(phrase(getSettings().language, decision === "decline" ? "declined" : "approved"));
     void runAtomCommand(
@@ -193,6 +181,8 @@ export class DriveSession {
     const request = this.snapshot.question;
     const question = request?.questions[0];
     if (!request || !question || request.questions.length !== 1) return;
+    this.promptPending = false;
+    this.listener.cancel();
     this.set({ question: null, lastHeard: answer });
     void runAtomCommand(
       appAtomRegistry,
@@ -210,7 +200,59 @@ export class DriveSession {
   }
 
   private say(text: string): void {
-    this.speaker.say(text);
+    // The agent does not talk over the user; it continues once they are done.
+    if (this.micOpening || this.listener.active || this.snapshot.sending) this.held.push(text);
+    else this.speaker.say(text);
+  }
+
+  /** The agent waits for the user: open the microphone once it has finished talking. */
+  private promptUser(): void {
+    this.promptPending = true;
+    void this.speaker.drained().then(() => this.afterSpeech());
+  }
+
+  private afterSpeech(): void {
+    if (
+      this.disposed ||
+      this.speaker.busy ||
+      this.micOpening ||
+      this.listener.active ||
+      this.snapshot.sending
+    ) {
+      return;
+    }
+    if (this.promptPending) {
+      this.promptPending = false;
+      void this.openMic();
+    } else {
+      // Nothing to say and nothing asked: the music gets its volume back.
+      void enterQuiet();
+    }
+  }
+
+  private async openMic(): Promise<void> {
+    if (this.disposed || this.micOpening || this.listener.active) return;
+    this.promptPending = false;
+    this.micOpening = true;
+    await enterListening();
+    const opened = await this.listener.start();
+    this.micOpening = false;
+    if (this.disposed) {
+      this.listener.cancel();
+      return;
+    }
+    this.set({ micOn: opened });
+    if (!opened) void enterQuiet();
+  }
+
+  private async onMicClosed(utterance: Utterance | null): Promise<void> {
+    this.set({ micOn: false, hearing: null });
+    if (utterance !== null) await this.onUtterance(utterance);
+    if (this.disposed) return;
+    const held = this.held;
+    this.held = [];
+    for (const text of held) this.speaker.say(text);
+    if (held.length === 0) this.afterSpeech();
   }
 
   private onThreadChanged(): void {
@@ -223,6 +265,7 @@ export class DriveSession {
     if (projection === null) return;
     const language = getSettings().language;
     let lastSaid = this.snapshot.lastSaid;
+    let asked = false;
     for (const event of this.feed.advance(projection, result.value.status === "live")) {
       if (event.type === "say") {
         lastSaid = event.text;
@@ -230,20 +273,26 @@ export class DriveSession {
       } else if (event.type === "run-finished") {
         if (event.status === "failed") this.say(phrase(language, "failed"));
         else if (event.status === "completed" && !event.spoke) this.say(phrase(language, "done"));
+        // A turn that ended on a question is the agent waiting for an answer.
+        if (event.status === "completed" && event.asksUser) asked = true;
       }
     }
     this.set({ joined: this.feed.joined, agentBusy: hasActiveRun(projection), lastSaid });
-    if (this.feed.joined) this.onPendingRequests();
+    if (this.feed.joined && this.onPendingRequests()) asked = true;
+    if (asked) this.promptUser();
   }
 
-  private onPendingRequests(): void {
+  /** Announces new requests. True when one was announced, which the user should answer. */
+  private onPendingRequests(): boolean {
     const requests = appAtomRegistry.get(environmentThreadDetails.pendingRequestsAtom(this.thread));
     const language = getSettings().language;
     const approval =
       requests?.approvals.find((candidate) => candidate.responseCapability === "live") ?? null;
     const question = requests?.userInputs[0] ?? null;
+    let announced = false;
     if (approval !== null && !this.announced.has(approval.requestId)) {
       this.announced.add(approval.requestId);
+      announced = true;
       const what = toSpeakableText(approval.reason ?? approval.detail ?? "", language).slice(
         0,
         MAX_SPOKEN_DETAIL,
@@ -256,6 +305,7 @@ export class DriveSession {
       if (only === undefined) {
         this.say(`${phrase(language, "question")} ${phrase(language, "questionInApp")}`);
       } else {
+        announced = true;
         const options = only.options.map((option, index) => `${index + 1}: ${option.label}.`);
         this.say(
           [
@@ -269,10 +319,11 @@ export class DriveSession {
     if (approval !== this.snapshot.approval || question !== this.snapshot.question) {
       this.set({ approval, question });
     }
+    return announced;
   }
 
   private async onUtterance(utterance: Utterance): Promise<void> {
-    this.set({ sending: true, hearing: null });
+    this.set({ sending: true });
     let text = utterance.text;
     const { openAiKey, language } = getSettings();
     if (openAiKey !== null && utterance.audioUri !== null) {
@@ -290,20 +341,24 @@ export class DriveSession {
     }
     deleteRecording(utterance.audioUri);
     text = text.trim();
-    if (this.disposed) return;
-    if (text) await this.handleSpoken(text);
-    this.set({ sending: false });
+    // `sending` is cleared first so what the app says next is not held back.
+    if (text && !this.disposed) {
+      const spoken = await this.handleSpoken(text);
+      this.set({ sending: false });
+      if (spoken !== null) this.say(spoken);
+    } else {
+      this.set({ sending: false });
+    }
   }
 
-  private async handleSpoken(text: string): Promise<void> {
+  /** Acts on what the user said. Returns what to say back, if anything. */
+  private async handleSpoken(text: string): Promise<string | null> {
     const command = spokenCommand(text);
-    if (command === "quiet") {
-      this.speaker.stop();
-      return;
-    }
+    if (command === "quiet") return null;
     if (this.snapshot.approval !== null && command !== null) {
+      this.set({ sending: false });
       this.respondToApproval(command === "approve" ? "accept" : "decline");
-      return;
+      return null;
     }
     const question = this.snapshot.question;
     const only = question?.questions.length === 1 ? question.questions[0] : undefined;
@@ -312,18 +367,17 @@ export class DriveSession {
         matchOption(text, only.options) ?? (only.allowCustomAnswer === false ? null : text);
       if (answer !== null) {
         this.answerQuestion(answer);
-        return;
+        return null;
       }
     }
-    await this.send(text);
+    return this.send(text);
   }
 
-  private async send(text: string): Promise<void> {
+  private async send(text: string): Promise<string> {
     const { environmentId, threadId } = this.thread;
     const language = getSettings().language;
     if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
-      this.say(phrase(language, "notAllowed"));
-      return;
+      return phrase(language, "notAllowed");
     }
     const metadata = makeQueuedMessageMetadata();
     this.set({ lastHeard: text });
@@ -340,9 +394,9 @@ export class DriveSession {
         ...(this.snapshot.agentBusy ? { dispatchMode: "steer" as const } : {}),
         createdAt: metadata.createdAt,
       });
-      this.say(phrase(language, "sent"));
+      return phrase(language, "sent");
     } catch {
-      this.say(phrase(language, "sendFailed"));
+      return phrase(language, "sendFailed");
     }
   }
 }

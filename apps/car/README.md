@@ -6,9 +6,12 @@ you only talk and listen:
 - **Joining is silent.** Nothing is sent and the thread's history is not read aloud. T3 Car
   follows the thread and speaks only what the agent writes after you joined, sentence by
   sentence while it streams, including its short remarks between tool calls.
-- **The microphone stays open.** Speak whenever you want, also while the agent works or talks
-  (talking cuts it off). While the agent works your message reaches the running turn.
-- **You never have to answer.** Staying quiet sends nothing; the app keeps following.
+- **The microphone opens when the agent waits for you.** That is when its turn ends on a
+  question, or it asks for approval or a choice. While it only says it is getting to work, the
+  microphone stays closed. One tap opens it at any other moment, also to cut the agent off.
+- **You never have to answer.** Say nothing and the microphone closes again after a few seconds.
+- **Your music keeps playing.** It is lowered only while a voice actually plays, and stops only
+  while the microphone is open.
 - **Approvals and questions get large buttons**, and "ja" / "nee" work by voice.
 
 It is a separate Expo app next to `apps/mobile`. The screens, the spoken loop and the audio are
@@ -18,7 +21,7 @@ it speaks the same protocol as the T3 Code app and `apps/mobile` needs no change
 
 ## Speech
 
-Apple's on-device speech recognition runs continuously and only decides when you start and stop
+While the microphone is open, Apple's on-device speech recognition decides when you start and stop
 talking. With an OpenAI API key (Settings in the app, stored in the Keychain) OpenAI transcribes
 what you said and reads the agent aloud. Without a key, or without reach, the on-device
 transcript and the iOS voice are used instead.

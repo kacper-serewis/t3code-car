@@ -8,8 +8,6 @@ export interface CarSettings {
   readonly language: CarLanguage;
   /** With a key, OpenAI reads replies aloud and transcribes what you say. */
   readonly openAiKey: string | null;
-  /** Talking while the agent speaks cuts it off. Off: tap the screen to cut it off. */
-  readonly voiceInterrupt: boolean;
 }
 
 const KEY = "t3car.settings.v1";
@@ -28,7 +26,6 @@ function load(): CarSettings {
   const defaults: CarSettings = {
     language: deviceLanguage(),
     openAiKey: null,
-    voiceInterrupt: true,
   };
   try {
     const raw = SecureStore.getItem(KEY);
@@ -43,7 +40,6 @@ function load(): CarSettings {
         typeof stored.openAiKey === "string" && stored.openAiKey.trim()
           ? stored.openAiKey.trim()
           : null,
-      voiceInterrupt: stored.voiceInterrupt !== false,
     };
   } catch {
     return defaults;

@@ -1,4 +1,5 @@
 import {
+  endsWithQuestion,
   nextSpeakableChunk,
   toSpeakableText,
   unfinishedSentenceStart,
@@ -27,6 +28,8 @@ export type FeedEvent =
       readonly status: string;
       /** Whether the agent said anything aloud during this run. */
       readonly spoke: boolean;
+      /** The run's last message closes with a question for the user. */
+      readonly asksUser: boolean;
     };
 
 const TERMINAL_RUN_STATUSES = new Set([
@@ -100,6 +103,7 @@ export class ThreadFeed {
           runId: run.id,
           status: run.status,
           spoke: this.runsWithSpeech.has(run.id),
+          asksUser: endsWithQuestion(lastAssistantText(projection, run.id)),
         });
       }
     }
@@ -117,4 +121,14 @@ export class ThreadFeed {
     }
     for (const run of projection.runs) this.runStatuses.set(run.id, run.status);
   }
+}
+
+function lastAssistantText(projection: FeedProjection, runId: string): string {
+  let text = "";
+  for (const message of projection.messages) {
+    if (message.role === "assistant" && message.runId === runId && !message.workflowScript) {
+      text = message.text;
+    }
+  }
+  return text;
 }

@@ -99,7 +99,9 @@ describe("ThreadFeed", () => {
     thread.advance({ messages: [], runs: [{ id: "run-1", status: "running" }] }, true);
     expect(
       thread.advance({ messages: [], runs: [{ id: "run-1", status: "completed" }] }, true),
-    ).toEqual([{ type: "run-finished", runId: "run-1", status: "completed", spoke: false }]);
+    ).toEqual([
+      { type: "run-finished", runId: "run-1", status: "completed", spoke: false, asksUser: false },
+    ]);
     // Reported once.
     expect(
       thread.advance({ messages: [], runs: [{ id: "run-1", status: "completed" }] }, true),
@@ -121,6 +123,28 @@ describe("ThreadFeed", () => {
         true,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("ThreadFeed questions", () => {
+  const finished = (text: string) => {
+    const thread = feed();
+    thread.advance({ messages: [], runs: [] }, true);
+    thread.advance({ messages: [], runs: [{ id: "run-1", status: "running" }] }, true);
+    return thread
+      .advance(
+        { messages: [assistant("m1", text)], runs: [{ id: "run-1", status: "completed" }] },
+        true,
+      )
+      .find((event) => event.type === "run-finished");
+  };
+
+  it("marks a finished run that asks the user something", () => {
+    expect(finished("Er zijn twee manieren. Welke wil je?")).toMatchObject({ asksUser: true });
+  });
+
+  it("does not for a run that only reports", () => {
+    expect(finished("Klaar, de tests slagen.")).toMatchObject({ asksUser: false });
   });
 });
 

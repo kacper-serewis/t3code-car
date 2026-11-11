@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  dropLeadingWords,
-  isLikelyEcho,
+  endsWithQuestion,
   nextSpeakableChunk,
   splitForSpeech,
   spokenCommand,
@@ -72,25 +71,25 @@ describe("splitForSpeech", () => {
   });
 });
 
-describe("isLikelyEcho", () => {
-  const spoken = "Ik heb de tests gedraaid en ze slagen allemaal. Zal ik nu de build starten?";
-
-  it("recognizes the app's own words coming back", () => {
-    expect(isLikelyEcho("de tests gedraaid en ze slagen", spoken)).toBe(true);
-    expect(isLikelyEcho("zal ik nu de bild starten", spoken)).toBe(true);
+describe("endsWithQuestion", () => {
+  it("is true when the reply closes with a question", () => {
+    expect(endsWithQuestion("Ik zie twee opties. Zal ik de eerste nemen?")).toBe(true);
+    expect(endsWithQuestion("Welke branch wil je?\n\nLaat het me weten.")).toBe(true);
+    expect(endsWithQuestion("Klaar. **Wil je dat ik ook push?**")).toBe(true);
   });
 
-  it("lets the user's own words through", () => {
-    expect(isLikelyEcho("nee wacht even met committen", spoken)).toBe(false);
-    expect(isLikelyEcho("ja doe maar", spoken)).toBe(false);
-    expect(isLikelyEcho("hallo", "")).toBe(false);
+  it("is false when the agent only reports or gets to work", () => {
+    expect(endsWithQuestion("Ik ga nu aan de slag met de tests.")).toBe(false);
+    expect(endsWithQuestion("Klaar, alles is gepusht.")).toBe(false);
+    expect(endsWithQuestion("")).toBe(false);
   });
-});
 
-describe("dropLeadingWords", () => {
-  it("removes the words that were echo", () => {
-    expect(dropLeadingWords("zal ik starten ja doe maar", 3)).toBe("ja doe maar");
-    expect(dropLeadingWords("ja", 3)).toBe("");
+  it("ignores a question the agent already moved past", () => {
+    expect(
+      endsWithQuestion(
+        "Waarom faalde dit? De import klopte niet. Ik heb hem hersteld. De tests slagen.",
+      ),
+    ).toBe(false);
   });
 });
 

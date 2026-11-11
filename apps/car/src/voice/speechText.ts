@@ -150,43 +150,17 @@ export function splitForSpeech(text: string, maxLength = 280): string[] {
   return parts;
 }
 
-function words(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-}
-
 /**
- * True when what the microphone heard is the app's own voice coming back through the speaker:
- * most of the heard words occur, in order, in what was just spoken.
+ * True when the text closes with a question for the user, which is when the microphone should
+ * open by itself. Only the last two sentences count, so a question earlier in a long reply
+ * that the agent went on to answer itself does not.
  */
-export function isLikelyEcho(heard: string, recentlySpoken: string): boolean {
-  const heardWords = words(heard);
-  if (heardWords.length === 0) return false;
-  const spokenWords = words(recentlySpoken);
-  if (spokenWords.length === 0) return false;
-  let matched = 0;
-  let cursor = 0;
-  for (const word of heardWords) {
-    const index = spokenWords.indexOf(word, cursor);
-    if (index >= 0) {
-      matched++;
-      cursor = index + 1;
-    }
-  }
-  return matched / heardWords.length >= 0.6;
-}
-
-/** Drops the first `count` words, for a transcript that began with the app's own voice. */
-export function dropLeadingWords(text: string, count: number): string {
-  if (count <= 0) return text.trim();
-  return text.trim().split(/\s+/).slice(count).join(" ");
-}
-
-export function wordCount(text: string): number {
-  return text.trim() ? text.trim().split(/\s+/).length : 0;
+export function endsWithQuestion(markdown: string): boolean {
+  const sentences = toSpeakableText(markdown)
+    .split(/(?<=[.!?…])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  return sentences.slice(-2).some((sentence) => sentence.endsWith("?"));
 }
 
 function normalizeCommand(transcript: string): string {

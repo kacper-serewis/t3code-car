@@ -1,6 +1,6 @@
 import { useEnvironments } from "@t3tools/mobile/src/state/environments";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { updateSettings, useSettings } from "../settings";
@@ -125,22 +125,6 @@ export function SettingsScreen(props: {
         </View>
 
         <View style={styles.section}>
-          <View style={styles.switchRow}>
-            <View style={styles.flex}>
-              <Text style={styles.heading}>Onderbreken met je stem</Text>
-              <Text style={ui.dim}>
-                Praat door de agent heen om hem te onderbreken. Uit: tik op het scherm om hem stil
-                te maken.
-              </Text>
-            </View>
-            <Switch
-              value={settings.voiceInterrupt}
-              onValueChange={(voiceInterrupt) => updateSettings({ voiceInterrupt })}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.heading}>Computers</Text>
           {environments.map((environment) => (
             <View key={environment.environmentId} style={styles.environment}>
@@ -175,7 +159,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 12 },
   flex: { flex: 1 },
   compactButton: { minHeight: 60 },
-  switchRow: { flexDirection: "row", alignItems: "center", gap: 16 },
   environment: {
     padding: 16,
     borderRadius: 16,

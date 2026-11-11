@@ -3,11 +3,9 @@ import type { File } from "expo-file-system";
 import * as Speech from "expo-speech";
 
 import { getSettings } from "../settings";
+import { enterSpeaking } from "./audioSession";
 import { synthesizeSpeech } from "./openai";
 import { splitForSpeech } from "./speechText";
-
-/** How long spoken text stays relevant for telling the app's own voice from the user's. */
-const RECENT_MS = 12_000;
 
 interface Prepared {
   readonly text: string;
@@ -16,7 +14,7 @@ interface Prepared {
 }
 
 /**
- * Reads text aloud in order. With an OpenAI key the next sentence is synthesized while the
+ * Reads text aloud in order, lowering other audio while a voice plays. With an OpenAI key the next sentence is synthesized while the
  * current one plays; without one, or when OpenAI cannot be reached, the system voice reads it.
  */
 export class Speaker {
@@ -26,7 +24,6 @@ export class Speaker {
   private stopCurrent: (() => void) | null = null;
   private abort: AbortController | null = null;
   private waiters: Array<() => void> = [];
-  private recent: Array<{ readonly text: string; readonly at: number }> = [];
   private isSpeaking = false;
 
   constructor(private readonly onSpeakingChange: (speaking: boolean) => void) {}
@@ -35,11 +32,9 @@ export class Speaker {
     return this.isSpeaking;
   }
 
-  /** What was said in the last seconds, for recognizing echo of the app's own voice. */
-  recentText(): string {
-    const cutoff = Date.now() - RECENT_MS;
-    this.recent = this.recent.filter((entry) => entry.at >= cutoff);
-    return this.recent.map((entry) => entry.text).join(" ");
+  /** Something is playing or still on its way to being played. */
+  get busy(): boolean {
+    return this.pumping || this.queue.length > 0;
   }
 
   say(text: string): void {
@@ -101,8 +96,13 @@ export class Speaker {
           discard(audio);
           break;
         }
+        // The music is lowered only now that there is a voice to play, not while it was made.
+        await enterSpeaking();
+        if (generation !== this.generation) {
+          discard(audio);
+          break;
+        }
         this.setSpeaking(true);
-        this.recent.push({ text: current.text, at: Date.now() });
         if (audio !== null) await this.play(audio);
         else await this.speakWithSystemVoice(current.text);
         // Text queued while this sentence played.
@@ -164,7 +164,7 @@ export class Speaker {
       };
       Speech.speak(text, {
         language: getSettings().language,
-        // Share the listening session, so the microphone's echo cancellation hears this voice.
+        // The app's session is what lowers the music.
         useApplicationAudioSession: true,
         onDone: finish,
         onStopped: finish,
