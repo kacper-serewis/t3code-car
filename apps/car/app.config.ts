@@ -54,9 +54,13 @@ const config: ExpoConfig = {
   extra: {
     appVariant: "production",
     iosPersonalTeamBuild: true,
-    // T3 Car pairs directly with a server; it has no T3 Connect account.
-    relay: { url: null },
-    clerk: { publishableKey: null, jwtTemplate: null },
+    // T3 Connect sign-in appears only in builds that carry this configuration; see
+    // docs/operations/connect-setup.md.
+    relay: { url: repoEnv.T3CODE_RELAY_URL ?? null },
+    clerk: {
+      publishableKey: repoEnv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? null,
+      jwtTemplate: repoEnv.EXPO_PUBLIC_CLERK_JWT_TEMPLATE ?? null,
+    },
     observability: { tracesUrl: null, tracesDataset: null, tracesToken: null },
   },
 };

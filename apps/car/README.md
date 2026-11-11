@@ -29,8 +29,14 @@ transcript and the iOS voice are used instead.
 
 ## Running it
 
-T3 Car pairs directly with a T3 Code server over your LAN or tailnet: create a pairing link in
-T3 Code under Settings › Sharing & access and scan it. It has no T3 Connect sign-in.
+There are two ways to reach your computer:
+
+- **T3 Connect**, from anywhere. Sign in with a code sent to your email address and add the
+  computers linked to your account. This appears only in builds that carry the T3 Connect
+  configuration: run `cp .env.example .env` in the repository root before building, as
+  [Connect setup](../../docs/operations/connect-setup.md) describes.
+- **Directly**, over your LAN or tailnet. Create a pairing link in T3 Code under Settings ›
+  Sharing & access and scan it.
 
 Signing uses your own team. Put these in the repository's `.env.local`:
 

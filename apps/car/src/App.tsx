@@ -1,5 +1,6 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { environmentCatalog } from "@t3tools/mobile/src/connection/catalog";
+import { CloudAuthProvider } from "@t3tools/mobile/src/features/cloud/CloudAuthProvider";
 import { appAtomRegistry } from "@t3tools/mobile/src/state/atom-registry";
 import { installThreadOutboxDelivery } from "@t3tools/mobile/src/state/threadOutboxDelivery";
 import { useState } from "react";
@@ -24,10 +25,12 @@ type Route =
 export default function App() {
   return (
     <RegistryContext.Provider value={appAtomRegistry}>
-      <SafeAreaProvider>
-        <StatusBar barStyle="light-content" />
-        <Screens />
-      </SafeAreaProvider>
+      <CloudAuthProvider>
+        <SafeAreaProvider>
+          <StatusBar barStyle="light-content" />
+          <Screens />
+        </SafeAreaProvider>
+      </CloudAuthProvider>
     </RegistryContext.Provider>
   );
 }

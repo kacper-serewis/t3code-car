@@ -133,6 +133,10 @@
       // Expo only links what this app lists itself. Babel is the Expo preset's peer.
       "ignoreDependencies": [
         "@babel/core",
+        // Peers of the Clerk SDK that T3 Connect sign-in uses.
+        "expo-application",
+        "expo-auth-session",
+        "expo-web-browser",
         "expo-constants",
         "expo-crypto",
         "expo-device",
