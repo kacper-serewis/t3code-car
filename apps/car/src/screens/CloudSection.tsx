@@ -9,10 +9,9 @@ import type { RelayClientEnvironmentRecord } from "@t3tools/contracts/relay";
 import { environmentCatalog } from "@t3tools/mobile/src/connection/catalog";
 import { appAtomRegistry } from "@t3tools/mobile/src/state/atom-registry";
 import { relayEnvironmentDiscovery } from "@t3tools/mobile/src/state/relay";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
 
-import { colors, ui } from "../theme";
+import { FieldRow, Row, Section } from "../ui";
 
 function messageOf(error: unknown, fallback: string): string {
   if (error && typeof error === "object") {
@@ -21,29 +20,45 @@ function messageOf(error: unknown, fallback: string): string {
       readonly message?: string;
     };
     const first = clerk.errors?.[0];
-    const text = first?.longMessage ?? first?.message ?? clerk.message;
-    if (text?.trim()) return text;
+    const message = first?.longMessage ?? first?.message ?? clerk.message;
+    if (message?.trim()) return message;
   }
   return fallback;
 }
 
 /**
- * T3 Connect: sign in with a code sent by email, then add the computers linked to the account.
- * Rendered only in builds that carry the T3 Connect configuration, inside the Clerk provider.
+ * T3 Connect on the pairing screen: sign in with a code sent by email, then add the computers
+ * linked to the account. Rendered only in builds configured for T3 Connect, inside Clerk.
  */
 export function CloudSection(props: { readonly onConnected: () => void }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) {
+    return (
+      <Section header="T3 Connect">
+        <Row title="Laden…" />
+      </Section>
+    );
+  }
+  return isSignedIn ? <LinkedComputers onConnected={props.onConnected} /> : <EmailCodeSignIn />;
+}
+
+/** The account in Settings: who is signed in, and a way out. */
+export function CloudAccount(props: { readonly onSignIn: () => void }) {
   const { isLoaded, isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+  if (!isLoaded) return null;
+  if (!isSignedIn) {
+    return (
+      <Section header="T3 Connect">
+        <Row kind="action" title="Log in" onPress={props.onSignIn} />
+      </Section>
+    );
+  }
   return (
-    <View style={styles.section}>
-      <Text style={styles.heading}>T3 Connect</Text>
-      {!isLoaded ? (
-        <Text style={ui.dim}>Laden…</Text>
-      ) : isSignedIn ? (
-        <SignedIn onConnected={props.onConnected} onSignOut={() => void signOut()} />
-      ) : (
-        <EmailCodeSignIn />
-      )}
-    </View>
+    <Section header="T3 Connect">
+      <Row title={user?.primaryEmailAddress?.emailAddress ?? "Ingelogd"} />
+      <Row kind="destructive" title="Log uit" onPress={() => void signOut()} />
+    </Section>
   );
 }
 
@@ -88,84 +103,76 @@ function EmailCodeSignIn() {
 
   if (!codeSent) {
     return (
-      <>
-        <Text style={ui.dim}>Log in met het e-mailadres van je T3 Connect-account.</Text>
-        <TextInput
+      <Section
+        header="T3 Connect"
+        footer={error ?? "Je krijgt een code per e-mail om in te loggen."}
+      >
+        <FieldRow
           value={email}
           onChangeText={setEmail}
           placeholder="E-mailadres"
-          placeholderTextColor={colors.textDim}
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="email"
           keyboardType="email-address"
           returnKeyType="send"
           onSubmitEditing={() => void sendCode()}
-          style={ui.input}
         />
-        <Pressable
+        <Row
+          kind="action"
+          title={busy ? "Versturen…" : "Stuur code"}
           disabled={busy || !email.trim()}
           onPress={() => void sendCode()}
-          style={({ pressed }) => [
-            ui.bigButton,
-            styles.button,
-            (pressed || busy || !email.trim()) && ui.pressed,
-          ]}
-        >
-          <Text style={ui.bigButtonText}>{busy ? "Versturen…" : "Stuur code"}</Text>
-        </Pressable>
-        {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-      </>
+        />
+      </Section>
     );
   }
 
   return (
-    <>
-      <Text style={ui.dim}>Vul de code in die naar {email.trim()} is gestuurd.</Text>
-      <TextInput
+    <Section header="T3 Connect" footer={error ?? `De code is gestuurd naar ${email.trim()}.`}>
+      <FieldRow
         value={code}
         onChangeText={setCode}
         placeholder="Code"
-        placeholderTextColor={colors.textDim}
         autoComplete="one-time-code"
         textContentType="oneTimeCode"
         keyboardType="number-pad"
         returnKeyType="done"
         onSubmitEditing={() => void verify()}
-        style={ui.input}
       />
-      <Pressable
+      <Row
+        kind="action"
+        title={busy ? "Controleren…" : "Log in"}
         disabled={busy || !code.trim()}
         onPress={() => void verify()}
-        style={({ pressed }) => [
-          ui.bigButton,
-          styles.button,
-          (pressed || busy || !code.trim()) && ui.pressed,
-        ]}
-      >
-        <Text style={ui.bigButtonText}>{busy ? "Controleren…" : "Log in"}</Text>
-      </Pressable>
-      <Pressable
+      />
+      <Row
+        kind="action"
+        title="Ander e-mailadres"
         onPress={() => {
           setCodeSent(false);
           setCode("");
           setError(null);
         }}
-        style={({ pressed }) => [styles.link, pressed && ui.pressed]}
-      >
-        <Text style={ui.dim}>Ander e-mailadres</Text>
-      </Pressable>
-      {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-    </>
+      />
+    </Section>
   );
 }
 
-function SignedIn(props: { readonly onConnected: () => void; readonly onSignOut: () => void }) {
+function LinkedComputers(props: { readonly onConnected: () => void }) {
   const { user } = useUser();
   const discovery = useAtomValue(relayEnvironmentDiscovery.stateValueAtom);
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const [error, setError] = useState<string | null>(null);
   const environments = [...discovery.environments.values()].map((entry) => entry.environment);
+
+  // The list is read once per sign-in; without this it stays empty until the app restarts.
+  useEffect(() => {
+    void runAtomCommand(appAtomRegistry, relayEnvironmentDiscovery.refresh, undefined, {
+      label: "car:refresh-relay-environments",
+      reportFailure: false,
+    });
+  }, []);
 
   const add = async (environment: RelayClientEnvironmentRecord) => {
     setError(null);
@@ -185,53 +192,28 @@ function SignedIn(props: { readonly onConnected: () => void; readonly onSignOut:
   };
 
   return (
-    <>
-      <Text style={ui.dim}>
-        Ingelogd als {user?.primaryEmailAddress?.emailAddress ?? "je T3 Connect-account"}.
-      </Text>
+    <Section
+      header="T3 Connect"
+      footer={error ?? `Ingelogd als ${user?.primaryEmailAddress?.emailAddress ?? "je account"}.`}
+    >
       {environments.length === 0 ? (
-        <Text style={ui.dim}>
-          {discovery.refreshing
-            ? "Computers zoeken…"
-            : "Geen computers gevonden. Zet T3 Connect aan in T3 Code op je computer."}
-        </Text>
+        <Row
+          title={discovery.refreshing ? "Computers zoeken…" : "Geen computers gevonden"}
+          subtitle={discovery.refreshing ? null : "Zet T3 Connect aan in T3 Code op je computer."}
+        />
       ) : null}
       {environments.map((environment) => {
         const added = catalog.entries.has(environment.environmentId);
         return (
-          <Pressable
+          <Row
             key={environment.environmentId}
-            disabled={added}
-            onPress={() => void add(environment)}
-            style={({ pressed }) => [
-              ui.bigButton,
-              styles.button,
-              added && styles.added,
-              pressed && ui.pressed,
-            ]}
-          >
-            <Text numberOfLines={1} style={ui.bigButtonText}>
-              {added ? `${environment.label} ✓` : `Koppel ${environment.label}`}
-            </Text>
-          </Pressable>
+            kind={added ? "text" : "action"}
+            title={environment.label}
+            checked={added}
+            onPress={added ? undefined : () => void add(environment)}
+          />
         );
       })}
-      {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable
-        onPress={props.onSignOut}
-        style={({ pressed }) => [styles.link, pressed && ui.pressed]}
-      >
-        <Text style={ui.dim}>Uitloggen</Text>
-      </Pressable>
-    </>
+    </Section>
   );
 }
-
-const styles = StyleSheet.create({
-  section: { gap: 12 },
-  heading: { color: colors.text, fontSize: 20, fontWeight: "700" },
-  button: { minHeight: 64, backgroundColor: colors.accent },
-  added: { backgroundColor: colors.surfaceRaised },
-  link: { minHeight: 44, justifyContent: "center" },
-  error: { color: colors.danger, fontSize: 17, lineHeight: 24 },
-});

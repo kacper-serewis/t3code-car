@@ -20,8 +20,7 @@ const config: ExpoConfig = {
   version: "0.1.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
-  userInterfaceStyle: "dark",
-  backgroundColor: "#000000",
+  userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: false,
     bundleIdentifier,

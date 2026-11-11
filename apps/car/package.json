@@ -39,6 +39,7 @@
     "expo-speech": "~58.0.3",
     "expo-speech-recognition": "58.0.1",
     "expo-sqlite": "~58.0.15",
+    "expo-symbols": "~58.0.4",
     "expo-web-browser": "~58.0.7",
     "react": "catalog:",
     "react-native": "0.88.1",
@@ -49,5 +50,10 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "babel-preset-expo": "~58.0.24"
+  },
+  "expo": {
+    "autolinking": {
+      "nativeModulesDir": "../mobile/modules"
+    }
   }
 }

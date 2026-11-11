@@ -2,12 +2,11 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { useEnvironments } from "@t3tools/mobile/src/state/environments";
 import { environmentThreadShells } from "@t3tools/mobile/src/state/threads";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { DriveThreadRef } from "../drive/driveSession";
 import { isTerminalRunStatus } from "../drive/threadFeed";
-import { colors, ui } from "../theme";
+import { colors, LargeTitle, NavBar, NavButton, Row, Screen, Section, text } from "../ui";
 
 const MAX_THREADS = 40;
 
@@ -24,11 +23,6 @@ const STATE_LABEL: Record<ThreadState, string> = {
   waiting: "Wacht op jou",
   working: "Bezig",
   idle: "",
-};
-const STATE_COLOR: Record<ThreadState, string> = {
-  waiting: colors.danger,
-  working: colors.working,
-  idle: colors.muted,
 };
 
 function activityAt(thread: EnvironmentThreadShell): string {
@@ -64,71 +58,59 @@ export function ThreadPickerScreen(props: {
   );
 
   return (
-    <SafeAreaView style={ui.screen} edges={["top", "left", "right"]}>
-      <View style={ui.header}>
-        <Text style={ui.title}>T3 Car</Text>
-        <Pressable
-          accessibilityLabel="Instellingen"
-          onPress={props.onOpenSettings}
-          style={({ pressed }) => [ui.headerButton, pressed && ui.pressed]}
-        >
-          <Text style={ui.headerButtonText}>Instellingen</Text>
-        </Pressable>
-      </View>
-      {!connected ? (
-        <Text style={[ui.dim, styles.status]}>
-          {environments.length === 0 ? "Geen server gekoppeld." : "Verbinden met je computer…"}
-        </Text>
-      ) : null}
-      <FlatList
-        data={threads}
-        keyExtractor={(thread) => `${thread.environmentId}:${thread.id}`}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          connected ? (
-            <Text style={[ui.dim, styles.status]}>Geen threads gevonden.</Text>
-          ) : undefined
-        }
-        renderItem={({ item }) => {
-          const state = threadState(item);
-          return (
-            <Pressable
-              onPress={() =>
-                props.onJoin({ environmentId: item.environmentId, threadId: item.id }, item.title)
-              }
-              style={({ pressed }) => [styles.row, pressed && ui.pressed]}
-            >
-              <View style={[styles.dot, { backgroundColor: STATE_COLOR[state] }]} />
-              <View style={styles.rowText}>
-                <Text numberOfLines={2} style={styles.rowTitle}>
-                  {item.title || "Naamloze thread"}
-                </Text>
-                <Text style={ui.dim}>
-                  {[STATE_LABEL[state], relativeTime(activityAt(item))].filter(Boolean).join(" · ")}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        }}
-      />
-    </SafeAreaView>
+    <Screen>
+      <NavBar right={<NavButton title="Instellingen" onPress={props.onOpenSettings} />} />
+      <ScrollView contentContainerStyle={styles.content}>
+        <LargeTitle>Threads</LargeTitle>
+        {threads.length > 0 ? (
+          <Section>
+            {threads.map((thread) => {
+              const state = threadState(thread);
+              return (
+                <Row
+                  key={`${thread.environmentId}:${thread.id}`}
+                  title={thread.title || "Naamloze thread"}
+                  titleLines={2}
+                  subtitle={[STATE_LABEL[state], relativeTime(activityAt(thread))]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  chevron
+                  leading={
+                    state === "idle" ? undefined : (
+                      <View
+                        style={[
+                          styles.dot,
+                          { backgroundColor: state === "waiting" ? colors.red : colors.orange },
+                        ]}
+                      />
+                    )
+                  }
+                  onPress={() =>
+                    props.onJoin(
+                      { environmentId: thread.environmentId, threadId: thread.id },
+                      thread.title,
+                    )
+                  }
+                />
+              );
+            })}
+          </Section>
+        ) : (
+          <Text style={[text.secondary, styles.empty]}>
+            {environments.length === 0
+              ? "Geen computer gekoppeld."
+              : connected
+                ? "Geen threads gevonden."
+                : "Verbinden met je computer…"}
+          </Text>
+        )}
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  status: { paddingHorizontal: 20, paddingVertical: 12 },
-  list: { paddingHorizontal: 12, paddingBottom: 40, gap: 8 },
-  row: {
-    minHeight: 84,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-  },
-  dot: { width: 14, height: 14, borderRadius: 7 },
-  rowText: { flex: 1, gap: 4 },
-  rowTitle: { color: colors.text, fontSize: 21, fontWeight: "600", lineHeight: 27 },
+  content: { paddingBottom: 40 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  empty: { paddingHorizontal: 20, paddingTop: 12 },
 });

@@ -1,12 +1,19 @@
+import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
+import { environmentCatalog } from "@t3tools/mobile/src/connection/catalog";
+import { hasCloudPublicConfig } from "@t3tools/mobile/src/features/cloud/publicConfig";
+import { appAtomRegistry } from "@t3tools/mobile/src/state/atom-registry";
 import { useEnvironments } from "@t3tools/mobile/src/state/environments";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Alert, ScrollView, StyleSheet } from "react-native";
 
 import { updateSettings, useSettings } from "../settings";
-import { colors, ui } from "../theme";
+import { FieldRow, LargeTitle, NavBar, NavButton, Row, Screen, Section } from "../ui";
 import { checkApiKey } from "../voice/openai";
 import type { CarLanguage } from "../voice/speechText";
+import { CloudAccount } from "./CloudSection";
+
+// A build-time constant: T3 Connect exists only in builds configured for it.
+const cloudEnabled = hasCloudPublicConfig();
 
 const LANGUAGES: ReadonlyArray<{ readonly value: CarLanguage; readonly label: string }> = [
   { value: "nl-NL", label: "Nederlands" },
@@ -48,121 +55,94 @@ export function SettingsScreen(props: {
       return;
     }
     updateSettings({ openAiKey: draft });
-    setKeyStatus("Key opgeslagen. OpenAI leest voor en verstaat je.");
+    setKeyStatus("Key bewaard. OpenAI leest voor en verstaat je.");
   };
 
+  const confirmRemove = (
+    environmentId: (typeof environments)[number]["environmentId"],
+    label: string,
+  ) =>
+    Alert.alert(`${label} verwijderen?`, "Je kunt de computer later opnieuw koppelen.", [
+      { text: "Annuleer", style: "cancel" },
+      {
+        text: "Verwijder",
+        style: "destructive",
+        onPress: () =>
+          void runAtomCommand(appAtomRegistry, environmentCatalog.remove, environmentId, {
+            label: "car:remove-environment",
+            reportFailure: true,
+          }),
+      },
+    ]);
+
   return (
-    <SafeAreaView style={ui.screen}>
-      <View style={ui.header}>
-        <Text style={ui.title}>Instellingen</Text>
-        <Pressable
-          onPress={props.onClose}
-          style={({ pressed }) => [ui.headerButton, pressed && ui.pressed]}
-        >
-          <Text style={ui.headerButtonText}>Klaar</Text>
-        </Pressable>
-      </View>
+    <Screen>
+      <NavBar right={<NavButton bold title="Gereed" onPress={props.onClose} />} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.section}>
-          <Text style={styles.heading}>OpenAI API-key</Text>
-          <Text style={ui.dim}>
-            Met een key leest OpenAI de agent voor en zet het om wat je zegt (Whisper). Zonder key,
-            of zonder bereik, gebruikt T3 Car de stem en spraakherkenning van iOS. De key staat
-            alleen in de sleutelhanger van dit toestel.
-          </Text>
-          <TextInput
+        <LargeTitle>Instellingen</LargeTitle>
+
+        <Section
+          header="OpenAI API-key"
+          footer={
+            keyStatus ??
+            "Met een key leest OpenAI de agent voor en zet het om wat je zegt. Zonder key, of zonder bereik, gebruikt T3 Car de stem en spraakherkenning van iOS. De key staat alleen in de sleutelhanger van dit toestel."
+          }
+        >
+          <FieldRow
             value={keyDraft}
             onChangeText={(value) => {
               setKeyDraft(value);
               setKeyStatus(null);
             }}
             placeholder="sk-…"
-            placeholderTextColor={colors.textDim}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
-            style={ui.input}
           />
-          <Pressable
+          <Row
+            kind={draft || settings.openAiKey === null ? "action" : "destructive"}
+            title={
+              checking
+                ? "Controleren…"
+                : draft || settings.openAiKey === null
+                  ? "Bewaar"
+                  : "Verwijder key"
+            }
             disabled={!keyChanged || checking}
             onPress={() => void saveKey()}
-            style={({ pressed }) => [
-              ui.bigButton,
-              styles.compactButton,
-              { backgroundColor: colors.accent },
-              (pressed || !keyChanged || checking) && ui.pressed,
-            ]}
-          >
-            <Text style={ui.bigButtonText}>
-              {checking ? "Controleren…" : draft ? "Opslaan" : "Verwijder key"}
-            </Text>
-          </Pressable>
-          {keyStatus !== null ? <Text style={ui.body}>{keyStatus}</Text> : null}
-        </View>
+          />
+        </Section>
 
-        <View style={styles.section}>
-          <Text style={styles.heading}>Taal</Text>
-          <View style={styles.row}>
-            {LANGUAGES.map((language) => (
-              <Pressable
-                key={language.value}
-                onPress={() => updateSettings({ language: language.value })}
-                style={({ pressed }) => [
-                  ui.bigButton,
-                  styles.compactButton,
-                  styles.flex,
-                  {
-                    backgroundColor:
-                      settings.language === language.value ? colors.accent : colors.surfaceRaised,
-                  },
-                  pressed && ui.pressed,
-                ]}
-              >
-                <Text style={ui.bigButtonText}>{language.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.heading}>Computers</Text>
-          {environments.map((environment) => (
-            <View key={environment.environmentId} style={styles.environment}>
-              <Text style={ui.body}>{environment.label}</Text>
-              <Text style={ui.dim}>
-                {PHASE_LABEL[environment.connection.phase] ?? environment.connection.phase}
-                {environment.connection.error ? ` · ${environment.connection.error}` : ""}
-              </Text>
-            </View>
+        <Section header="Taal">
+          {LANGUAGES.map((language) => (
+            <Row
+              key={language.value}
+              title={language.label}
+              checked={settings.language === language.value}
+              onPress={() => updateSettings({ language: language.value })}
+            />
           ))}
-          <Pressable
-            onPress={props.onAddServer}
-            style={({ pressed }) => [
-              ui.bigButton,
-              styles.compactButton,
-              { backgroundColor: colors.surfaceRaised },
-              pressed && ui.pressed,
-            ]}
-          >
-            <Text style={ui.bigButtonText}>Computer koppelen</Text>
-          </Pressable>
-        </View>
+        </Section>
+
+        {cloudEnabled ? <CloudAccount onSignIn={props.onAddServer} /> : null}
+
+        <Section header="Computers" footer="Tik op een computer om hem te verwijderen.">
+          {environments.map((environment) => (
+            <Row
+              key={environment.environmentId}
+              title={environment.label}
+              subtitle={environment.connection.error}
+              detail={PHASE_LABEL[environment.connection.phase] ?? environment.connection.phase}
+              onPress={() => confirmRemove(environment.environmentId, environment.label)}
+            />
+          ))}
+          <Row kind="action" title="Computer koppelen" onPress={props.onAddServer} />
+        </Section>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 20, paddingBottom: 48, gap: 28 },
-  section: { gap: 12 },
-  heading: { color: colors.text, fontSize: 20, fontWeight: "700" },
-  row: { flexDirection: "row", gap: 12 },
-  flex: { flex: 1 },
-  compactButton: { minHeight: 60 },
-  environment: {
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    gap: 2,
-  },
+  content: { paddingBottom: 48 },
 });

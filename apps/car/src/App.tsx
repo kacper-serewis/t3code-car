@@ -4,7 +4,6 @@ import { CloudAuthProvider } from "@t3tools/mobile/src/features/cloud/CloudAuthP
 import { appAtomRegistry } from "@t3tools/mobile/src/state/atom-registry";
 import { installThreadOutboxDelivery } from "@t3tools/mobile/src/state/threadOutboxDelivery";
 import { useState } from "react";
-import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import type { DriveThreadRef } from "./drive/driveSession";
@@ -27,7 +26,6 @@ export default function App() {
     <RegistryContext.Provider value={appAtomRegistry}>
       <CloudAuthProvider>
         <SafeAreaProvider>
-          <StatusBar barStyle="light-content" />
           <Screens />
         </SafeAreaProvider>
       </CloudAuthProvider>
